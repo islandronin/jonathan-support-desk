@@ -3,7 +3,13 @@ import { convexAuth } from "@convex-dev/auth/server";
 import { MutationCtx } from "./_generated/server";
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
-  providers: [Password],
+  providers: [
+    Password({
+      profile(params) {
+        return { email: (params.email as string).toLowerCase() };
+      },
+    }),
+  ],
   callbacks: {
     async createOrUpdateUser(ctx: MutationCtx, args) {
       if (args.existingUserId) {

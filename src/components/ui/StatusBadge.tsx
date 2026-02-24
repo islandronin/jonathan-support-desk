@@ -5,7 +5,7 @@ import { STATUS_COLORS, STATUS_LABELS } from "@/lib/utils";
 export function StatusBadge({ status }: { status: string }) {
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[status] ?? "bg-gray-100 text-gray-600"}`}
+      className={`inline-flex items-center rounded-[6px] px-2.5 py-1 text-[12px] font-semibold ${STATUS_COLORS[status] ?? "bg-[var(--color-gray-100)] text-[var(--color-gray-600)]"}`}
     >
       {STATUS_LABELS[status] ?? status}
     </span>
