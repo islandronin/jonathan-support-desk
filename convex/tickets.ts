@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
@@ -466,5 +466,199 @@ export const unassignTicket = mutation({
       assignedAgentId: undefined,
       updatedAt: Date.now(),
     });
+  },
+});
+
+// ---- Inbound Email Processing ----
+
+export const processInboundEmail = internalMutation({
+  args: {
+    senderEmail: v.string(),
+    subject: v.string(),
+    body: v.string(),
+    toAddress: v.string(),
+    emailMessageId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const senderEmail = args.senderEmail.toLowerCase().trim();
+    console.log(`[inbound-email] Processing from=${senderEmail} subject="${args.subject}" to=${args.toAddress}`);
+
+    // Try to match existing ticket
+    // Method 1: ticket+{ticketId}@ in the To address
+    const ticketIdMatch = args.toAddress.match(/ticket\+([a-z0-9]+)@/i);
+    // Method 2: [Ticket #XXXX] in subject line
+    const ticketNumMatch = args.subject.match(/\[Ticket #(\d+)\]/);
+
+    let ticket: {
+      _id: typeof args.senderEmail extends string ? any : never;
+      ticketNumber: number;
+      subject: string;
+      customerId: any;
+      productId: any;
+      status: string;
+      assignedAgentId?: any;
+      createdAt: number;
+      updatedAt: number;
+    } | null = null;
+
+    if (ticketIdMatch) {
+      try {
+        const found = await ctx.db.get(ticketIdMatch[1] as any);
+        if (found && "ticketNumber" in found) {
+          ticket = found as any;
+          console.log(`[inbound-email] Matched ticket by ID: ${ticketIdMatch[1]}`);
+        }
+      } catch {
+        console.log(`[inbound-email] Invalid ticket ID in To address: ${ticketIdMatch[1]}`);
+      }
+    }
+
+    if (!ticket && ticketNumMatch) {
+      const ticketNumber = parseInt(ticketNumMatch[1], 10);
+      ticket = await ctx.db
+        .query("tickets")
+        .withIndex("by_ticketNumber", (q) => q.eq("ticketNumber", ticketNumber))
+        .first() as any;
+      if (ticket) {
+        console.log(`[inbound-email] Matched ticket by number: #${ticketNumber}`);
+      }
+    }
+
+    // Find or create customer
+    let customer = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", senderEmail))
+      .first();
+
+    if (!customer) {
+      console.log(`[inbound-email] Creating new customer for ${senderEmail}`);
+      const customerId = await ctx.db.insert("users", {
+        email: senderEmail,
+        name: "",
+        role: "customer",
+        emailConfirmed: false,
+      });
+      customer = await ctx.db.get(customerId);
+    }
+
+    if (!customer) {
+      console.error(`[inbound-email] Failed to get/create customer for ${senderEmail}`);
+      return;
+    }
+
+    const now = Date.now();
+
+    if (ticket) {
+      // Append reply to existing ticket
+      await ctx.db.insert("messages", {
+        ticketId: ticket._id,
+        authorId: customer._id,
+        body: args.body,
+        isInternal: false,
+        source: "email",
+        emailMessageId: args.emailMessageId,
+        createdAt: now,
+      });
+
+      // If ticket was awaiting_customer, set back to open
+      const updates: { updatedAt: number; status?: "open" } = { updatedAt: now };
+      if (ticket.status === "awaiting_customer") {
+        updates.status = "open";
+      }
+      await ctx.db.patch(ticket._id, updates);
+
+      // Notify assigned agent
+      if (ticket.assignedAgentId) {
+        const agent = await ctx.db.get(ticket.assignedAgentId) as any;
+        if (agent?.email) {
+          await ctx.scheduler.runAfter(0, internal.email.sendReplyNotification, {
+            recipientEmail: agent.email,
+            recipientName: agent.name ?? "",
+            senderName: customer.name ?? customer.email ?? "Customer",
+            ticketNumber: ticket.ticketNumber,
+            ticketSubject: ticket.subject,
+            messagePreview: args.body,
+            ticketId: ticket._id as string,
+            isAgentView: true,
+          });
+        }
+      }
+
+      console.log(`[inbound-email] Appended reply to ticket #${ticket.ticketNumber}`);
+    } else {
+      // Create new ticket — use first active product as default
+      const defaultProduct = await ctx.db
+        .query("products")
+        .withIndex("by_active", (q) => q.eq("active", true))
+        .first();
+
+      if (!defaultProduct) {
+        console.error("[inbound-email] No active products found, cannot create ticket");
+        return;
+      }
+
+      // Get next ticket number
+      const counter = await ctx.db
+        .query("counters")
+        .withIndex("by_name", (q) => q.eq("name", "ticketNumber"))
+        .unique();
+
+      let ticketNumber: number;
+      if (!counter) {
+        await ctx.db.insert("counters", { name: "ticketNumber", value: 1001 });
+        ticketNumber = 1000;
+      } else {
+        ticketNumber = counter.value;
+        await ctx.db.patch(counter._id, { value: counter.value + 1 });
+      }
+
+      // Clean up subject (remove Re:/Fwd: prefixes)
+      const cleanSubject = args.subject
+        .replace(/^(Re|Fwd|Fw):\s*/gi, "")
+        .trim() || "Email inquiry";
+
+      const ticketId = await ctx.db.insert("tickets", {
+        ticketNumber,
+        subject: cleanSubject,
+        customerId: customer._id,
+        productId: defaultProduct._id,
+        status: "open",
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      await ctx.db.insert("messages", {
+        ticketId,
+        authorId: customer._id,
+        body: args.body,
+        isInternal: false,
+        source: "email",
+        emailMessageId: args.emailMessageId,
+        createdAt: now,
+      });
+
+      // Send confirmation to customer
+      if (customer.email) {
+        await ctx.scheduler.runAfter(0, internal.email.sendTicketConfirmation, {
+          customerEmail: customer.email,
+          customerName: customer.name ?? "",
+          ticketNumber,
+          subject: cleanSubject,
+          ticketId: ticketId as string,
+        });
+      }
+
+      // Alert agents
+      await ctx.scheduler.runAfter(0, internal.email.sendNewTicketAlert, {
+        ticketNumber,
+        subject: cleanSubject,
+        customerName: customer.name ?? customer.email ?? "Unknown",
+        productName: defaultProduct.name,
+        ticketId: ticketId as string,
+        productId: defaultProduct._id,
+      });
+
+      console.log(`[inbound-email] Created new ticket #${ticketNumber} from email`);
+    }
   },
 });
