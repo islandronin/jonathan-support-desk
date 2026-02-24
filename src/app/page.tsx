@@ -4,38 +4,38 @@ import {
   Timer,
   ShieldCheck,
   Users,
-  GraduationCap,
+  Unlock,
   Bot,
-  Wrench,
+  Sparkles,
   LayoutTemplate,
   Briefcase,
-  Crown,
+  Paintbrush,
 } from "lucide-react";
 
 const categories = [
   {
-    icon: GraduationCap,
-    title: "Online Courses",
-    slug: "online-courses",
-    description: "Help with course access, enrollment, and content playback",
+    icon: Unlock,
+    title: "Unchained Freedom",
+    slug: "unchained-freedom",
+    description: "Course access, enrollment, and content playback issues",
     iconBg: "bg-[var(--color-blue-50)]",
     iconColor: "text-[var(--color-blue)]",
   },
   {
     icon: Bot,
-    title: "AI Agents",
-    slug: "ai-agents",
+    title: "InfoSuperAgent",
+    slug: "infosuperagent",
     description:
-      "Setup, configuration, and troubleshooting for AI agent tools",
+      "Setup, configuration, and troubleshooting for your AI agent",
     iconBg: "bg-[var(--color-green-50)]",
     iconColor: "text-[var(--color-green-500)]",
   },
   {
-    icon: Wrench,
-    title: "Software Tools",
-    slug: "software-tools",
+    icon: Sparkles,
+    title: "Advanced AI Monetization",
+    slug: "advanced-ai-monetization",
     description:
-      "Bugs, feature requests, and technical issues with our software",
+      "Help with AI monetization strategies, tools, and course content",
     iconBg: "bg-[var(--color-orange-50)]",
     iconColor: "text-[var(--color-orange-500)]",
   },
@@ -50,19 +50,19 @@ const categories = [
   },
   {
     icon: Briefcase,
-    title: "CyberStaffing",
-    slug: "cyberstaffing",
+    title: "Cyber Staffing Agency",
+    slug: "cyber-staffing-agency",
     description:
       "Staffing platform issues with profiles, matching, and contracts",
     iconBg: "bg-[var(--color-red-50)]",
     iconColor: "text-[var(--color-red-500)]",
   },
   {
-    icon: Crown,
-    title: "Membership Sites",
-    slug: "membership-sites",
+    icon: Paintbrush,
+    title: "Consistent Characters",
+    slug: "consistent-characters",
     description:
-      "Billing, access, and account management for membership platforms",
+      "AI art character consistency tools, settings, and image generation",
     iconBg: "bg-[var(--color-cyan-50)]",
     iconColor: "text-[var(--color-cyan-500)]",
   },
@@ -71,13 +71,13 @@ const categories = [
 const steps = [
   {
     num: "1",
-    title: "Create an Account",
-    description: "Sign up with your email in seconds",
+    title: "Choose a Product",
+    description: "Select the product you need help with",
   },
   {
     num: "2",
-    title: "Submit a Ticket",
-    description: "Tell us what product and describe your issue",
+    title: "Describe Your Issue",
+    description: "Tell us what's happening and we'll create your account",
   },
   {
     num: "3",
@@ -184,6 +184,12 @@ export default function Home() {
             </Link>
           ))}
         </div>
+        <Link
+          href="/support"
+          className="text-[15px] font-medium text-[var(--color-blue)] hover:underline"
+        >
+          View all 16 products &rarr;
+        </Link>
       </section>
 
       {/* How It Works */}
