@@ -15,6 +15,16 @@ export const listProducts = query({
   },
 });
 
+export const getProductBySlug = query({
+  args: { slug: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("products")
+      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+      .first();
+  },
+});
+
 export const listCustomerTickets = query({
   args: {},
   handler: async (ctx) => {

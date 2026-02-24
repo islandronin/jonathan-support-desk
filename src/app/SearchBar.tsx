@@ -12,9 +12,9 @@ export default function SearchBar() {
     e.preventDefault();
     const subject = query.trim();
     if (subject) {
-      router.push(`/tickets/new?subject=${encodeURIComponent(subject)}`);
+      router.push(`/support?subject=${encodeURIComponent(subject)}`);
     } else {
-      router.push("/tickets/new");
+      router.push("/support");
     }
   };
 

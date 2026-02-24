@@ -16,6 +16,7 @@ const categories = [
   {
     icon: GraduationCap,
     title: "Online Courses",
+    slug: "online-courses",
     description: "Help with course access, enrollment, and content playback",
     iconBg: "bg-[var(--color-blue-50)]",
     iconColor: "text-[var(--color-blue)]",
@@ -23,6 +24,7 @@ const categories = [
   {
     icon: Bot,
     title: "AI Agents",
+    slug: "ai-agents",
     description:
       "Setup, configuration, and troubleshooting for AI agent tools",
     iconBg: "bg-[var(--color-green-50)]",
@@ -31,6 +33,7 @@ const categories = [
   {
     icon: Wrench,
     title: "Software Tools",
+    slug: "software-tools",
     description:
       "Bugs, feature requests, and technical issues with our software",
     iconBg: "bg-[var(--color-orange-50)]",
@@ -39,6 +42,7 @@ const categories = [
   {
     icon: LayoutTemplate,
     title: "Origami Sites",
+    slug: "origami-sites",
     description:
       "Website builder support for templates, domains, and publishing",
     iconBg: "bg-[var(--color-purple-50)]",
@@ -47,6 +51,7 @@ const categories = [
   {
     icon: Briefcase,
     title: "CyberStaffing",
+    slug: "cyberstaffing",
     description:
       "Staffing platform issues with profiles, matching, and contracts",
     iconBg: "bg-[var(--color-red-50)]",
@@ -55,6 +60,7 @@ const categories = [
   {
     icon: Crown,
     title: "Membership Sites",
+    slug: "membership-sites",
     description:
       "Billing, access, and account management for membership platforms",
     iconBg: "bg-[var(--color-cyan-50)]",
@@ -96,7 +102,7 @@ export default function Home() {
             Log In
           </Link>
           <Link
-            href="/login"
+            href="/support"
             className="rounded-full bg-[var(--color-blue)] px-6 py-2.5 text-[14px] font-semibold text-white hover:opacity-90 transition-opacity"
           >
             Submit a Ticket
@@ -120,7 +126,7 @@ export default function Home() {
         {/* CTA Buttons */}
         <div className="flex items-center gap-4">
           <Link
-            href="/login"
+            href="/support"
             className="rounded-full bg-[var(--color-blue)] px-8 py-3.5 text-[15px] font-semibold text-white hover:opacity-90 transition-opacity"
           >
             Submit a Ticket
@@ -159,9 +165,9 @@ export default function Home() {
         </h2>
         <div className="grid w-full grid-cols-3 gap-5">
           {categories.map((cat) => (
-            <a
+            <Link
               key={cat.title}
-              href="#"
+              href={`/support/${cat.slug}`}
               className="group flex flex-col gap-4 rounded-[16px] border-[1.5px] border-[var(--color-gray-200)] bg-white p-7 shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-shadow hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]"
             >
               <div
@@ -175,7 +181,7 @@ export default function Home() {
               <p className="text-[14px] leading-[1.5] text-[var(--color-gray-500)]">
                 {cat.description}
               </p>
-            </a>
+            </Link>
           ))}
         </div>
       </section>
