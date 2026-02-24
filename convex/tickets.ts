@@ -1,4 +1,5 @@
 import { query, mutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 
@@ -272,6 +273,29 @@ export const createTicket = mutation({
       createdAt: now,
     });
 
+    // Send email notifications
+    const customer = await ctx.db.get(userId);
+    const product = await ctx.db.get(args.productId);
+
+    if (customer?.email) {
+      await ctx.scheduler.runAfter(0, internal.email.sendTicketConfirmation, {
+        customerEmail: customer.email,
+        customerName: customer.name ?? "",
+        ticketNumber,
+        subject: args.subject,
+        ticketId: ticketId as string,
+      });
+    }
+
+    await ctx.scheduler.runAfter(0, internal.email.sendNewTicketAlert, {
+      ticketNumber,
+      subject: args.subject,
+      customerName: customer?.name ?? customer?.email ?? "Unknown",
+      productName: product?.name ?? "Unknown",
+      ticketId: ticketId as string,
+      productId: args.productId,
+    });
+
     return ticketId;
   },
 });
@@ -331,6 +355,51 @@ export const addMessage = mutation({
     }
 
     await ctx.db.patch(args.ticketId, updates);
+
+    // Send reply notification (skip internal notes)
+    if (!isInternal) {
+      const product = await ctx.db.get(ticket.productId);
+
+      if (isStaff) {
+        // Agent replied → notify customer
+        const customer = await ctx.db.get(ticket.customerId);
+        if (customer?.email) {
+          await ctx.scheduler.runAfter(
+            0,
+            internal.email.sendReplyNotification,
+            {
+              recipientEmail: customer.email,
+              recipientName: customer.name ?? "",
+              senderName: user?.name ?? user?.email ?? "Support Agent",
+              ticketNumber: ticket.ticketNumber,
+              ticketSubject: ticket.subject,
+              messagePreview: args.body,
+              ticketId: args.ticketId as string,
+              isAgentView: false,
+            }
+          );
+        }
+      } else if (ticket.assignedAgentId) {
+        // Customer replied → notify assigned agent
+        const agent = await ctx.db.get(ticket.assignedAgentId);
+        if (agent?.email) {
+          await ctx.scheduler.runAfter(
+            0,
+            internal.email.sendReplyNotification,
+            {
+              recipientEmail: agent.email,
+              recipientName: agent.name ?? "",
+              senderName: user?.name ?? user?.email ?? "Customer",
+              ticketNumber: ticket.ticketNumber,
+              ticketSubject: ticket.subject,
+              messagePreview: args.body,
+              ticketId: args.ticketId as string,
+              isAgentView: true,
+            }
+          );
+        }
+      }
+    }
   },
 });
 
