@@ -1,6 +1,6 @@
 import Link from "next/link";
+import SearchBar from "./SearchBar";
 import {
-  Search,
   Timer,
   ShieldCheck,
   Users,
@@ -115,14 +115,7 @@ export default function Home() {
         </p>
 
         {/* Search Bar */}
-        <div className="flex h-[56px] w-full max-w-[640px] items-center gap-3 rounded-[16px] border-[1.5px] border-[var(--color-gray-200)] bg-white px-5 shadow-[0_4px_16px_rgba(0,0,0,0.04)]">
-          <Search className="h-5 w-5 shrink-0 text-[#a1a1aa]" />
-          <input
-            type="text"
-            placeholder="Describe your issue or search for help..."
-            className="w-full bg-transparent text-[15px] text-[var(--color-navy)] placeholder:text-[#a1a1aa] outline-none"
-          />
-        </div>
+        <SearchBar />
 
         {/* CTA Buttons */}
         <div className="flex items-center gap-4">
