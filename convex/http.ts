@@ -39,6 +39,15 @@ http.route({
         subject = (formData.get("subject") as string | null) ?? "";
         body = (formData.get("text") as string | null) ?? "";
         toAddress = (formData.get("to") as string | null) ?? "";
+
+        // Fall back to html field if text is empty (some email clients only send HTML)
+        if (!body.trim()) {
+          const html = (formData.get("html") as string | null) ?? "";
+          if (html) {
+            body = stripHtml(html);
+            console.log(`[inbound-email] Used html field (text was empty), extracted ${body.length} chars`);
+          }
+        }
         const headers = (formData.get("headers") as string | null) ?? "";
 
         // Extract email from "Name <email>" format
@@ -110,6 +119,23 @@ http.route({
     }
   }),
 });
+
+// Strip HTML tags to extract plain text
+function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<\/div>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
 
 // Strip quoted reply content from email body
 function stripQuotedReply(text: string): string {

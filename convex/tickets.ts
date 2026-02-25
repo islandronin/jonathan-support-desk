@@ -586,16 +586,40 @@ export const processInboundEmail = internalMutation({
 
       console.log(`[inbound-email] Appended reply to ticket #${ticket.ticketNumber}`);
     } else {
-      // Create new ticket — use first active product as default
-      const defaultProduct = await ctx.db
+      // Try to detect product from email subject + body
+      const allProducts = await ctx.db
         .query("products")
         .withIndex("by_active", (q) => q.eq("active", true))
-        .first();
+        .collect();
 
-      if (!defaultProduct) {
+      if (allProducts.length === 0) {
         console.error("[inbound-email] No active products found, cannot create ticket");
         return;
       }
+
+      const searchText = `${args.subject} ${args.body}`.toLowerCase();
+      let matchedProduct = null;
+
+      for (const product of allProducts) {
+        // Check for product name match (case-insensitive)
+        if (searchText.includes(product.name.toLowerCase())) {
+          matchedProduct = product;
+          console.log(`[inbound-email] Matched product by name: ${product.name}`);
+          break;
+        }
+        // Check for slug match (e.g. "origami-sites" or "origami")
+        const slugParts = product.slug.split("-");
+        for (const part of slugParts) {
+          if (part.length >= 4 && searchText.includes(part)) {
+            matchedProduct = product;
+            console.log(`[inbound-email] Matched product by slug part "${part}": ${product.name}`);
+            break;
+          }
+        }
+        if (matchedProduct) break;
+      }
+
+      const defaultProduct = matchedProduct ?? allProducts.sort((a, b) => a.sortOrder - b.sortOrder)[0];
 
       // Get next ticket number
       const counter = await ctx.db
