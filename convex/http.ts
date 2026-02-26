@@ -34,20 +34,39 @@ http.route({
       if (contentType.includes("multipart/form-data")) {
         const formData = await request.formData();
 
+        // Debug: log all form data field names and value lengths
+        const fieldNames: string[] = [];
+        formData.forEach((_value, key) => {
+          const val = _value as string;
+          fieldNames.push(`${key}(${typeof val === "string" ? val.length : "non-string"})`);
+        });
+        console.log(`[inbound-email] Form fields: ${fieldNames.join(", ")}`);
+
         // SendGrid Inbound Parse fields
         const from = formData.get("from") as string | null;
         subject = (formData.get("subject") as string | null) ?? "";
-        body = (formData.get("text") as string | null) ?? "";
+        const textField = formData.get("text") as string | null;
+        const htmlField = formData.get("html") as string | null;
+        const emailField = formData.get("email") as string | null;
         toAddress = (formData.get("to") as string | null) ?? "";
 
-        // Fall back to html field if text is empty (some email clients only send HTML)
-        if (!body.trim()) {
-          const html = (formData.get("html") as string | null) ?? "";
-          if (html) {
-            body = stripHtml(html);
-            console.log(`[inbound-email] Used html field (text was empty), extracted ${body.length} chars`);
-          }
+        console.log(`[inbound-email] Raw fields: text=${textField ? textField.length : "null"} html=${htmlField ? htmlField.length : "null"} email=${emailField ? emailField.length : "null"}`);
+
+        // Try plain text first
+        body = textField ?? "";
+
+        // Fall back to html field if text is empty
+        if (!body.trim() && htmlField) {
+          body = stripHtml(htmlField);
+          console.log(`[inbound-email] Used html field, extracted ${body.length} chars`);
         }
+
+        // Fall back to raw email MIME parsing if both text and html are empty
+        if (!body.trim() && emailField) {
+          body = extractBodyFromRawEmail(emailField);
+          console.log(`[inbound-email] Used raw email field, extracted ${body.length} chars`);
+        }
+
         const headers = (formData.get("headers") as string | null) ?? "";
 
         // Extract email from "Name <email>" format
@@ -135,6 +154,62 @@ function stripHtml(html: string): string {
     .replace(/&#39;/g, "'")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+// Decode quoted-printable encoding (=XX hex codes and =\r\n soft line breaks)
+function decodeQuotedPrintable(text: string): string {
+  return text
+    .replace(/=\r?\n/g, "")  // Remove soft line breaks
+    .replace(/=([0-9A-Fa-f]{2})/g, (_match, hex) =>
+      String.fromCharCode(parseInt(hex, 16))
+    );
+}
+
+// Extract body from raw MIME email (SendGrid Raw mode sends full email as "email" field)
+function extractBodyFromRawEmail(raw: string): string {
+  // Detect if this is a multipart email
+  const boundaryMatch = raw.match(/boundary="?([^\s"]+)"?/i);
+
+  if (boundaryMatch) {
+    const boundary = boundaryMatch[1];
+    const parts = raw.split(new RegExp(`--${boundary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+
+    let plainText = "";
+    let htmlText = "";
+
+    for (const part of parts) {
+      const isQP = /Content-Transfer-Encoding:\s*quoted-printable/i.test(part);
+      // Find content after the part headers (double newline)
+      const bodyStart = part.search(/\r?\n\r?\n/);
+      if (bodyStart < 0) continue;
+      let content = part.substring(bodyStart).trim();
+      if (isQP) content = decodeQuotedPrintable(content);
+
+      if (/Content-Type:\s*text\/plain/i.test(part)) {
+        plainText = content;
+      } else if (/Content-Type:\s*text\/html/i.test(part)) {
+        htmlText = content;
+      }
+    }
+
+    if (plainText) return plainText;
+    if (htmlText) return stripHtml(htmlText);
+  }
+
+  // Non-multipart: just get the body after headers
+  const isQP = /Content-Transfer-Encoding:\s*quoted-printable/i.test(raw);
+  const headerEnd = raw.search(/\r?\n\r?\n/);
+  if (headerEnd > 0) {
+    let bodyPart = raw.substring(headerEnd + 2).trim();
+    if (isQP) bodyPart = decodeQuotedPrintable(bodyPart);
+
+    if (bodyPart.includes("<html") || bodyPart.includes("<body") || bodyPart.includes("<div")) {
+      return stripHtml(bodyPart);
+    }
+    return bodyPart;
+  }
+
+  return "";
 }
 
 // Strip quoted reply content from email body
