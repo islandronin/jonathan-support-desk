@@ -22,8 +22,8 @@ export function RoleRedirect({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Redirect admins away from customer/agent pages
-    if (isAdmin && !pathname.startsWith("/admin")) {
+    // Redirect admins away from customer pages (but allow /agent routes for ticket management)
+    if (isAdmin && !pathname.startsWith("/admin") && !pathname.startsWith("/agent")) {
       router.replace("/admin/dashboard");
       return;
     }
