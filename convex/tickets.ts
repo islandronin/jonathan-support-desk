@@ -296,6 +296,13 @@ export const createTicket = mutation({
       productId: args.productId,
     });
 
+    await ctx.scheduler.runAfter(0, internal.email.sendTelegramNotification, {
+      ticketNumber,
+      subject: args.subject,
+      customerEmail: customer?.email ?? "Unknown",
+      productName: product?.name ?? "Unknown",
+    });
+
     return ticketId;
   },
 });
@@ -680,6 +687,14 @@ export const processInboundEmail = internalMutation({
         productName: defaultProduct.name,
         ticketId: ticketId as string,
         productId: defaultProduct._id,
+      });
+
+      // Telegram notification
+      await ctx.scheduler.runAfter(0, internal.email.sendTelegramNotification, {
+        ticketNumber,
+        subject: cleanSubject,
+        customerEmail: customer.email ?? "Unknown",
+        productName: defaultProduct.name,
       });
 
       console.log(`[inbound-email] Created new ticket #${ticketNumber} from email`);
