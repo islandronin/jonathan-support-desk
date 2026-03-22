@@ -235,4 +235,31 @@ function stripQuotedReply(text: string): string {
   return result.trim() || text.trim();
 }
 
+// ---- Open Tickets API (for second-brain bot polling) ----
+
+http.route({
+  path: "/api/open-tickets",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const apiKey = request.headers.get("x-api-key");
+    const expectedKey = process.env.TICKET_API_KEY;
+
+    if (!expectedKey || apiKey !== expectedKey) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const tickets = await ctx.runQuery(
+      internal.ticketApi.getOpenTicketsWithBody
+    );
+
+    return new Response(JSON.stringify({ tickets }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }),
+});
+
 export default http;
