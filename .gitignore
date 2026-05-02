@@ -43,3 +43,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .worktree-status.md
+PROJECT-STATUS.md
+
+# graphify (commit outputs, ignore caches/transient state)
+graphify-out/cache/
+graphify-out/manifest.json
+graphify-out/cost.json
+graphify-out/.graphify_python
